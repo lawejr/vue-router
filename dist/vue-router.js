@@ -93,7 +93,7 @@ var View = {
       }
     }
 
-    // also regiseter instance in prepatch hook
+    // also register instance in prepatch hook
     // in case the same component instance is reused across different routes
     ;(data.hook || (data.hook = {})).prepatch = function (_, vnode) {
       matched.instances[name] = vnode.componentInstance;
@@ -1114,8 +1114,12 @@ function addRouteRecord (
     );
   }
 
-  var normalizedPath = normalizePath(path, parent);
   var pathToRegexpOptions = route.pathToRegexpOptions || {};
+  var normalizedPath = normalizePath(
+    path,
+    parent,
+    pathToRegexpOptions.strict
+  );
 
   if (typeof route.caseSensitive === 'boolean') {
     pathToRegexpOptions.sensitive = route.caseSensitive;
@@ -1214,8 +1218,8 @@ function compileRouteRegex (path, pathToRegexpOptions) {
   return regex
 }
 
-function normalizePath (path, parent) {
-  path = path.replace(/\/$/, '');
+function normalizePath (path, parent, strict) {
+  if (!strict) { path = path.replace(/\/$/, ''); }
   if (path[0] === '/') { return path }
   if (parent == null) { return path }
   return cleanPath(((parent.path) + "/" + path))
@@ -1299,6 +1303,12 @@ function createMatcher (
 
   function addRoutes (routes) {
     createRouteMap(routes, pathList, pathMap, nameMap);
+  }
+
+  function removeRoutes () {
+    pathList.splice(0, pathList.length);
+    Object.keys(pathMap).forEach(function (key) { return (delete pathMap[key]); });
+    Object.keys(nameMap).forEach(function (key) { return (delete nameMap[key]); });
   }
 
   function match (
@@ -1449,7 +1459,8 @@ function createMatcher (
 
   return {
     match: match,
-    addRoutes: addRoutes
+    addRoutes: addRoutes,
+    removeRoutes: removeRoutes
   }
 }
 
@@ -1843,7 +1854,12 @@ History.prototype.confirmTransition = function confirmTransition (route, onCompl
   if (
     isSameRoute(route, current) &&
     // in the case the route map has been dynamically appended to
-    route.matched.length === current.matched.length
+    route.matched.length === current.matched.length &&
+    // additional check for case when routes were replaced and we have
+    // exactly same route but different component(s)
+    !route.matched.find(function (matched, index) {
+      return matched.components !== current.matched[index].components
+    })
   ) {
     this.ensureURL();
     return abort()
@@ -2484,6 +2500,11 @@ VueRouter.prototype.addRoutes = function addRoutes (routes) {
   if (this.history.current !== START) {
     this.history.transitionTo(this.history.getCurrentLocation());
   }
+};
+
+VueRouter.prototype.replaceRoutes = function replaceRoutes (routes) {
+  this.matcher.removeRoutes();
+  this.addRoutes(routes);
 };
 
 Object.defineProperties( VueRouter.prototype, prototypeAccessors );
