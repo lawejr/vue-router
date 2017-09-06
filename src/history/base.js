@@ -103,9 +103,9 @@ export class History {
       route.matched.length === current.matched.length &&
       // additional check for case when routes were replaced and we have
       // exactly same route but different component(s)
-      !route.matched.find((matched, index) => {
+      !route.matched.filter((matched, index) => {
         return matched.components !== current.matched[index].components
-      })
+      })[0]
     ) {
       this.ensureURL()
       return abort()
